@@ -4,111 +4,130 @@ import QtQuick.Dialogs    1.3
 
 Rectangle {
     id: _root
-    width:                    (80*10)+80
-    height:                   (50*10)+60+(50 * 2)
+    width:                    (80*_columnCount)+80
+    height:                   (50*_rowCount)+60+(50 * 2)
     color:                    "white"
 
-    property int _x:          -1
-    property int _y:          -1
+    property int _rowCount:    10
+    property int _columnCount: 10
+    property int _lastButton: -1
     property int _score:      0
     property bool firstClick: false
     property var mines:       []
     property alias _repeater: gridContainer.repeater
 
+
     function resetGame() {
         firstClick = false;
         _score = 0;
         mines = [];
-        _x = -1;
-        _y = -1;
-        for(let i = 0; i < 100; ++i) {
+        _lastButton = -1;
+
+        for(let i = 0; i < (_rowCount *_columnCount); ++i) {
             _repeater.itemAt(i)._clicked = false;
             _repeater.itemAt(i)._text = "";
             _repeater.itemAt(i).color = "lightgray";
         }
     }
 
-    function getSurroundingCells(x, y) {
-        var cells = []
-        for (var i = -1; i < 2; ++i) {
-            for (var j = -1; j < 2; ++j) {
-                if(x+i >= 0 && x+i < 10 && y+j >=0 && y+j < 10) {
+    // Given a cell, get all neighbouring cells
+    function getSurroundingCells(lastBtn) {
+        let x = Math.floor(lastBtn / _columnCount);
+        let y = lastBtn % _columnCount;
+        let cells = []
+
+        for (let i = -1; i < 2; ++i) {
+            for (let j = -1; j < 2; ++j) {
+                if(x+i >= 0 && x+i < _columnCount && y+j >=0 && y+j < _rowCount) {
                     cells.push([x+i, y+j]);
                 }
             }
         }
+        console.log("getSurroundingCells:", cells);
         return cells;
     }
 
     MessageDialog {
-        id: gameOverDialog
-        title: "Game Over!!"
-        text: "BOOM!!. Game Over. Your Score is %1/70.".arg(_score)
+        id:      gameOverDialog
+        title:   "Game Over!!"
+        text:    "BOOM!!. Game Over. Your Score is %1/70.".arg(_score)
+        onAccepted: {
+            resetGame();
+        }
+    }
+
+    MessageDialog {
+        id:     winDialog
+        title:  "Congratulation!!"
+        text:   "Congratulations. You won the game";
         onAccepted: {
             resetGame();
         }
     }
 
     Rectangle {
-        id: scoreLabel
-        anchors.left: parent.left
-        anchors.top: parent.top
-        width: parent.width
-        height: 45
-        color: "#f0f0f0"
-        border.color: Qt.lighter(color)
+        id:            scoreLabel
+        anchors.left:  parent.left
+        anchors.top:   parent.top
+        width:         parent.width
+        height:        45
+        color:         "#f0f0f0"
+        border.color:  Qt.lighter(color)
 
         Text {
             anchors.centerIn: parent
-            font.bold: true
-            font.pixelSize: 24
-            color: "green"
-            text: qsTr("Score: %1/70".arg(_score));
+            font.bold:        true
+            font.pixelSize:   24
+            color:            "green"
+            text:             qsTr("Score: %1/70".arg(_score));
         }
     }
 
     Rectangle {
-        id: gridContainer
-        anchors.left: parent.left
-        anchors.top: scoreLabel.bottom
+        id:            gridContainer
+        anchors.left:  parent.left
+        anchors.top:   scoreLabel.bottom
 
-        width: parent.width
-        height: parent.height - 100
+        width:         parent.width
+        height:        parent.height - 100
+
         property alias repeater: grid._repeater
-        GridLayout {
-            id: grid
-            anchors.fill: parent
-            columns: 10
-            Layout.rowSpan: 1
-            Layout.columnSpan: 1
-            property alias _repeater: repeater
-            Repeater {
-                id: repeater
-                model: 100
-                Rectangle {
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    color: _clicked ? "blue" : "lightgray"
-                    border.color: "black"
 
-                    property bool _clicked: false
-                    property int _index: index
-                    property string _color: "blue"
-                    property string _text: ""
+        GridLayout {
+            id:                grid
+            anchors.fill:      parent
+            columns:           10
+            Layout.rowSpan:    1
+            Layout.columnSpan: 1
+
+            property alias _repeater: repeater
+
+            Repeater {
+                id:        repeater
+                model:     100
+                Rectangle {
+                    Layout.fillWidth:    true
+                    Layout.fillHeight:   true
+                    color:               _clicked ? "blue" : "lightgray"
+                    border.color:        "black"
+
+                    property bool _clicked:   false
+                    property int _index:      index
+                    property string _color:   "blue"
+                    property string _text:     ""
 
                     Text {
                         anchors.centerIn: parent
-                        text: _text
-                        font.pointSize: 15
+                        text:             _text
+                        font.pointSize:   15
                     }
                     MouseArea {
                         anchors.fill: parent
                         onClicked: {
-
                             if(!_clicked) {
                                 _clicked = true
-                                var x = Math.floor(_index / 10)
-                                var y = _index % 10
+                                let x = Math.floor(_index / _columnCount)
+                                let y = _index % _columnCount
 
                                 if(!_root.firstClick) {
                                     _root.firstClick = true;
@@ -117,52 +136,57 @@ Rectangle {
                                         mines.push(0);
                                     }
 
-                                    let totalMines = 30;
+                                    // 30% of cells have mines
+                                    let totalMines = (_rowCount * _columnCount) * .3;
                                     while(totalMines) {
-                                        let rx = Math.floor(Math.random() * 100);
-                                        if(rx === x*10+y)
+                                        let rx = Math.floor(Math.random() * (_rowCount * _columnCount));
+                                        if(rx === index)
                                             continue;
                                         mines[rx] = -1;
                                         --totalMines;
                                     }
                                 }
 
-                                if(mines[x*10+y] === -1) {
+                                if(mines[index] === -1) {
+                                    repeater.itemAt(x*10+y).color = "red";
                                     console.log("BOOM!! Game Over.");
                                     gameOverDialog.visible = true;
                                     return;
                                 }
 
-                                if(_root._x !== -1 && _root._y !== -1) {
+                                if(_lastButton !== -1) {
                                     // clear previous neighbours
-                                    var c = getSurroundingCells(_root._x, _root._y);
+                                    var c = getSurroundingCells(_lastButton);
                                     for(var j = 0; j < c.length; ++j) {
-                                        const [_x, _y] = c[j]
-                                        repeater.itemAt(_x*10+_y).color = "lightgray";
+                                        const [x, y] = c[j]
+                                        repeater.itemAt(x*_columnCount+y).color = "lightgray";
                                     }
                                 }
 
                                 // highlight neighbours
-                                var cells = getSurroundingCells(x, y);
-                                for(var i = 0; i < cells.length; ++i) {
-                                    const [a, b] = cells[i]
-                                    repeater.itemAt(a*10+b).color = "cyan";
+                                let cells = getSurroundingCells(index);
+                                console.log("MouseClick:", cells)
+                                for(let i = 0; i < cells.length; ++i) {
+                                    const [a, b] = cells[i];
+                                    console.log("(", a, ",", b, ")", cells.length);
+                                    repeater.itemAt(a*_columnCount+b).color = "cyan";
                                 }
                                 repeater.itemAt(x*10+y).color = "blue";
 
                                 // count neighbouring mines
-                                let nMineCells = getSurroundingCells(x, y);
+                                let nMineCells = getSurroundingCells(index);
                                 let mineCount = 0;
                                 for(let i = 0; i < nMineCells.length; ++i) {
                                     const [a, b] = nMineCells[i];
-                                    if(mines[a*10+b] === -1)
+                                    if(mines[a*_columnCount+b] === -1)
                                         mineCount++;
                                 }
 
                                 _score++;
                                 _text = mineCount.toString();
-                                _root._x = x;
-                                _root._y = y;
+                                _lastButton = index;
+//                                _root._x = x;
+//                                _root._y = y;
                             }
 
                         }
@@ -187,22 +211,23 @@ Rectangle {
         MouseArea {
             anchors.fill: parent
             onPressed: {
-                for(let i = 0; i < 100; ++i) {
+                for(let i = 0; i < (_rowCount*_columnCount); ++i) {
                     if(mines[i] === -1)
                         _repeater.itemAt(i).color = "red";
                 }
             }
             onReleased: {
-                for(let i = 0; i < 100; ++i) {
+                for(let i = 0; i < (_rowCount*_columnCount); ++i) {
                     if(mines[i] === -1)
                         _repeater.itemAt(i).color = "lightgray";
                 }
                 // color neighbouring cell cyan
-                let cells = getSurroundingCells(_x, _y);
+                let cells = getSurroundingCells(_lastButton);
                 for(let j = 0; j < cells.length; ++j) {
                     let [x, y] = cells[j];
-                    if(!(_x === x && _y === y)) {
-                        _repeater.itemAt(x*10+y).color = "cyan";
+                    let idx = x*10+y;
+                    if(idx !== _lastButton) {
+                        _repeater.itemAt(idx).color = "cyan";
                     }
                 }
             }
@@ -225,7 +250,7 @@ Rectangle {
         MouseArea {
             anchors.fill: parent
             onPressed: {
-                let cells = getSurroundingCells(_root._x, _root._y);
+                let cells = getSurroundingCells(_lastButton);
                 for(let i = 0; i < cells.length; ++i) {
                     let [x, y] = cells[i];
                     if(mines[x*10+y] === -1)
@@ -233,11 +258,11 @@ Rectangle {
                 }
                             }
             onReleased: {
-                let cells = getSurroundingCells(_root._x, _root._y);
+                let cells = getSurroundingCells(_lastButton);
                 for(let i = 0; i < cells.length; ++i) {
                     const [x, y] = cells[i];
                     if(mines[x*10+y] === -1)
-                        _repeater.itemAt(x*10+y).color = "cyan";
+                        _repeater.itemAt(x*_columnCount+y).color = "cyan";
                 }
             }
         }
