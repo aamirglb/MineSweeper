@@ -4,26 +4,29 @@ import QtQuick.Dialogs    1.3
 
 Rectangle {
     id: _root
-    width:                    (80*_columnCount)+80
-    height:                   (50*_rowCount)+60+(50 * 2)
-    color:                    "white"
+    width:                      (80*_columnCount)+80
+    height:                     (50*_rowCount)+60+(50 * 2)
+    color:                      "white"
 
-    property int _rowCount:    10
-    property int _columnCount: 10
-    property int _lastButton: -1
-    property int _score:      0
-    property bool firstClick: false
-    property var mines:       []
-    property alias _repeater: gridContainer.repeater
+    property int _rowCount:     10
+    property int _columnCount:  10
+    property int _gridSize:     _rowCount * _columnCount
+    property int _mineCount:    Math.floor(_gridSize * 0.3)
+    property int _winScore:     _gridSize - _mineCount
+    property int _lastButton:   -1
+    property int _score:        0
+    property bool _firstClick:  false
+    property var _mines:        []
+    property alias _repeater:   gridContainer.repeater
 
 
     function resetGame() {
-        firstClick = false;
+        _firstClick = false;
         _score = 0;
-        mines = [];
+        _mines = [];
         _lastButton = -1;
 
-        for(let i = 0; i < (_rowCount *_columnCount); ++i) {
+        for(let i = 0; i < _gridSize; ++i) {
             _repeater.itemAt(i)._clicked = false;
             _repeater.itemAt(i)._text = "";
             _repeater.itemAt(i).color = "lightgray";
@@ -38,19 +41,18 @@ Rectangle {
 
         for (let i = -1; i < 2; ++i) {
             for (let j = -1; j < 2; ++j) {
-                if(x+i >= 0 && x+i < _columnCount && y+j >=0 && y+j < _rowCount) {
+                if(x+i >= 0 && x+i < _rowCount && y+j >=0 && y+j < _columnCount) {
                     cells.push([x+i, y+j]);
                 }
             }
         }
-        console.log("getSurroundingCells:", cells);
         return cells;
     }
 
     MessageDialog {
         id:      gameOverDialog
         title:   "Game Over!!"
-        text:    "BOOM!!. Game Over. Your Score is %1/70.".arg(_score)
+        text:    "BOOM!!. Game Over. Your Score is %1/%2.".arg(_score).arg(_winScore)
         onAccepted: {
             resetGame();
         }
@@ -79,7 +81,12 @@ Rectangle {
             font.bold:        true
             font.pixelSize:   24
             color:            "green"
-            text:             qsTr("Score: %1/70".arg(_score));
+            text:             qsTr("Score: %1/%2".arg(_score).arg(_winScore));
+        }
+        Component.onCompleted: {
+            console.log("_gridSize:", _gridSize)
+            console.log("_mineCount:", _mineCount)
+            console.log("_winScore:", _winScore)
         }
     }
 
@@ -96,7 +103,7 @@ Rectangle {
         GridLayout {
             id:                grid
             anchors.fill:      parent
-            columns:           10
+            columns:           _columnCount
             Layout.rowSpan:    1
             Layout.columnSpan: 1
 
@@ -104,7 +111,7 @@ Rectangle {
 
             Repeater {
                 id:        repeater
-                model:     100
+                model:     _gridSize
                 Rectangle {
                     Layout.fillWidth:    true
                     Layout.fillHeight:   true
@@ -129,26 +136,28 @@ Rectangle {
                                 let x = Math.floor(_index / _columnCount)
                                 let y = _index % _columnCount
 
-                                if(!_root.firstClick) {
-                                    _root.firstClick = true;
-                                    // polpulate the mines
-                                    for(let i = 0; i < 100; ++i){
-                                        mines.push(0);
+                                if(!_firstClick) {
+                                    _firstClick = true;
+                                    // polpulate the _mines
+                                    for(let i = 0; i < _gridSize; ++i){
+                                        _mines.push(0);
                                     }
 
-                                    // 30% of cells have mines
-                                    let totalMines = (_rowCount * _columnCount) * .3;
+                                    // 30% of cells have _mines
+                                    let totalMines = _mineCount;
                                     while(totalMines) {
-                                        let rx = Math.floor(Math.random() * (_rowCount * _columnCount));
-                                        if(rx === index)
+                                        let rx = Math.floor(Math.random() * _gridSize);
+                                        console.log("rx: ", rx);
+                                        if(rx === index || _mines[rx] === -1)
                                             continue;
-                                        mines[rx] = -1;
+                                        _mines[rx] = -1;
                                         --totalMines;
                                     }
+                                    console.log("_mines", _mines, _mineCount)
                                 }
 
-                                if(mines[index] === -1) {
-                                    repeater.itemAt(x*10+y).color = "red";
+                                if(_mines[index] === -1) {
+                                    repeater.itemAt(index).color = "red";
                                     console.log("BOOM!! Game Over.");
                                     gameOverDialog.visible = true;
                                     return;
@@ -156,8 +165,8 @@ Rectangle {
 
                                 if(_lastButton !== -1) {
                                     // clear previous neighbours
-                                    var c = getSurroundingCells(_lastButton);
-                                    for(var j = 0; j < c.length; ++j) {
+                                    let c = getSurroundingCells(_lastButton);
+                                    for(let j = 0; j < c.length; ++j) {
                                         const [x, y] = c[j]
                                         repeater.itemAt(x*_columnCount+y).color = "lightgray";
                                     }
@@ -165,67 +174,73 @@ Rectangle {
 
                                 // highlight neighbours
                                 let cells = getSurroundingCells(index);
-                                console.log("MouseClick:", cells)
+                                console.log(cells);
                                 for(let i = 0; i < cells.length; ++i) {
-                                    const [a, b] = cells[i];
-                                    console.log("(", a, ",", b, ")", cells.length);
-                                    repeater.itemAt(a*_columnCount+b).color = "cyan";
+                                    const [x, y] = cells[i];
+                                    repeater.itemAt(x*_columnCount+y).color = "cyan";
                                 }
-                                repeater.itemAt(x*10+y).color = "blue";
+                                repeater.itemAt(index).color = "blue";
 
                                 // count neighbouring mines
                                 let nMineCells = getSurroundingCells(index);
                                 let mineCount = 0;
                                 for(let i = 0; i < nMineCells.length; ++i) {
-                                    const [a, b] = nMineCells[i];
-                                    if(mines[a*_columnCount+b] === -1)
+                                    const [x, y] = nMineCells[i];
+                                    if(_mines[x*_columnCount+y] === -1)
                                         mineCount++;
                                 }
 
                                 _score++;
                                 _text = mineCount.toString();
                                 _lastButton = index;
-//                                _root._x = x;
-//                                _root._y = y;
-                            }
+                                console.log("_lastButton:", _lastButton)
 
+                                if(_score === _winScore) {
+                                    winDialog.visible = true;
+                                }
+                            }
                         }
                     }
                 }
             }
         }
     }
-    Rectangle {
-        anchors.left: parent.left
-        anchors.bottom: parent.bottom
-        anchors.leftMargin: 2
-        anchors.bottomMargin: 2
 
-        width: parent.width/2 - 4
-        height: 45
-        color: "lightgray"
+    Rectangle {
+        anchors.left:          parent.left
+        anchors.bottom:        parent.bottom
+        anchors.leftMargin:    2
+        anchors.bottomMargin:  2
+
+        width:                 parent.width/2 - 4
+        height:                45
+        color:                "lightgray"
         Text {
-            anchors.centerIn: parent
-            text: qsTr("All Mines")
+            anchors.centerIn:  parent
+            text:              qsTr("All Mines")
         }
         MouseArea {
-            anchors.fill: parent
+            anchors.fill:      parent
             onPressed: {
-                for(let i = 0; i < (_rowCount*_columnCount); ++i) {
-                    if(mines[i] === -1)
+                if(!_firstClick) return;
+
+                for(let i = 0; i < _gridSize; ++i) {
+                    if(_mines[i] === -1)
                         _repeater.itemAt(i).color = "red";
                 }
             }
             onReleased: {
-                for(let i = 0; i < (_rowCount*_columnCount); ++i) {
-                    if(mines[i] === -1)
+                if(!_firstClick) return;
+
+                for(let i = 0; i < _gridSize; ++i) {
+                    if(_mines[i] === -1)
                         _repeater.itemAt(i).color = "lightgray";
                 }
                 // color neighbouring cell cyan
                 let cells = getSurroundingCells(_lastButton);
                 for(let j = 0; j < cells.length; ++j) {
                     let [x, y] = cells[j];
-                    let idx = x*10+y;
+                    let idx = x*_columnCount+y;
                     if(idx !== _lastButton) {
                         _repeater.itemAt(idx).color = "cyan";
                     }
@@ -235,33 +250,35 @@ Rectangle {
     }
 
     Rectangle {
-        anchors.right: parent.right
-        anchors.bottom: parent.bottom
-        anchors.rightMargin: 2
-        anchors.bottomMargin: 2
+        anchors.right:         parent.right
+        anchors.bottom:        parent.bottom
+        anchors.rightMargin:   2
+        anchors.bottomMargin:  2
 
-        width: parent.width/2 - 4
-        height: 45
-        color: "lightgray"
+        width:                 parent.width/2 - 4
+        height:                45
+        color:                "lightgray"
         Text {
-            anchors.centerIn: parent
-            text: qsTr("Surrounding Mines")
+            anchors.centerIn:  parent
+            text:              qsTr("Surrounding Mines")
         }
         MouseArea {
-            anchors.fill: parent
+            anchors.fill:      parent
             onPressed: {
+                if(!_firstClick) return;
                 let cells = getSurroundingCells(_lastButton);
                 for(let i = 0; i < cells.length; ++i) {
                     let [x, y] = cells[i];
-                    if(mines[x*10+y] === -1)
-                        _repeater.itemAt(x*10+y).color = "red";
+                    if(_mines[x*_columnCount+y] === -1)
+                        _repeater.itemAt(x*_columnCount+y).color = "red";
                 }
                             }
             onReleased: {
+                if(!_firstClick) return;
                 let cells = getSurroundingCells(_lastButton);
                 for(let i = 0; i < cells.length; ++i) {
                     const [x, y] = cells[i];
-                    if(mines[x*10+y] === -1)
+                    if(_mines[x*_columnCount+y] === -1)
                         _repeater.itemAt(x*_columnCount+y).color = "cyan";
                 }
             }
