@@ -1,12 +1,8 @@
 #include "cMain.h"
+#include "cConsole.h"
+
 #include <iostream>
 #include <iomanip>
-
-#ifdef linux
-#include <ncurses.h>
-#endif
-
-#include "curses.h"
 
 // wxBEGIN_EVENT_TABLE(cMain, wxFrame)
 // 	EVT_BUTTON(10001, OnButtonClicked)
@@ -21,7 +17,8 @@ cMain::cMain() : wxFrame(nullptr,
     wxFont font(24, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD, false);
 
     btn = new wxButton*[_row * _column];
-    label = new wxStaticText(this, wxID_ANY, "Score: 0/70");
+    label = new wxStaticText(this, wxID_ANY, "");
+    label->SetFocus();
     label->SetFont(font);
 
     _mineCount = static_cast<int>(_gridSize * .3);
@@ -35,6 +32,8 @@ cMain::cMain() : wxFrame(nullptr,
             auto btnIdx = x * _column + y;
             btn[btnIdx] = new wxButton(this, 1000 + btnIdx);
             btn[btnIdx]->SetFont(font);
+            btn[btnIdx]->SetBackgroundColour(*wxLIGHT_GREY);
+
             /*wxString l;
             l.Printf("%d - (%d, %d)", btnIdx, x, y);
             btn[btnIdx]->SetLabel(l);*/
@@ -53,6 +52,8 @@ cMain::cMain() : wxFrame(nullptr,
 
     _neighbouringMines = new wxButton(this, 4001, "Neighbouring Mines", wxDefaultPosition, wxSize(400, 50));
     _neighbouringMines->SetFont(font);
+    _neighbouringMines->Bind(wxEVT_LEFT_DOWN, &cMain::OnNeighbourMinesPressed, this);
+    _neighbouringMines->Bind(wxEVT_LEFT_UP, &cMain::OnNeighbourMinesRelease, this);
     
     wxBoxSizer* buttonsSizer = new wxBoxSizer(wxHORIZONTAL);
     buttonsSizer->Add(_allMines, 0, wxEXPAND | wxALL);
@@ -65,51 +66,19 @@ cMain::cMain() : wxFrame(nullptr,
     mainSizer->Add(buttonsSizer);
     this->SetSizer(mainSizer);
     mainSizer->Layout();
+    updateScore();
 
-    // Initialise curses
-    //initscr();
-    //raw();
-    //curs_set(0);
-    //// printw("Hello World !!!");
-    //refresh();
+    _console = new cConsole(_mines, _row, _column);
+    _console->initConsole();
 }
 
 cMain::~cMain()
 {
     delete[]btn;
     delete[]_mines;
-    //endwin();
+    delete _console;
 }
 
-void cMain::printSheetCode()
-{
-    for (auto i = 0; i < (3 * _column); ++i)
-    //    printw("=");
-    //printw("\n");
-         std::cout << "=";
-     std::cout << '\n';
-
-    for (auto i = 0; i < _row; ++i) {
-        for (auto j = 0; j < _column; ++j) {
-            if (_mines[i * _column + j] == -1) {
-                 std::cout << " X ";
-                //printw(" X ");
-            }
-            else {
-                //printw(" . ");
-                 std::cout << " . ";
-            }
-        }
-        //printw("\n");
-         std::cout << "\n";
-    }
-    for (auto i = 0; i < (3 * _column); ++i)
-        //printw("*");
-         std::cout << "*";
-     std::cout << '\n';
-    //printw("\n");
-    //refresh();
-}
 
 cMain::ListOfCells cMain::getNeighouringCells(int32_t btnIdx)
 {
@@ -124,44 +93,26 @@ cMain::ListOfCells cMain::getNeighouringCells(int32_t btnIdx)
             }
         }
     }
-    for (auto p : cells) {
-        std::cout << "(" << p.first << ", " << p.second << ")\n";
-    }
     return cells;
 }
 
 
 void cMain::OnButtonClicked(wxCommandEvent& evt)
-{
-    //m_list1->AppendString(m_txt1->GetValue());
-    int x = (evt.GetId() - 1000) / _column;
-    int y = (evt.GetId() - 1000) % _column;
-    
+{    
     int32_t clickedBtnIdx = evt.GetId() - 1000;
 
-    /*move(0, 0);
-    printw("(%d, %d)\n", x, y);
-    refresh();*/
-    wxString msg;
-    msg.Printf("Position (%d, %d) clicked\n", x, y);
-
     if (!_firstClick) {
-        int mines = _mineCount;
+        int32_t mines = _mineCount;
 
         while (mines) {
             auto mineIdx = id(dre);
-            
             if (clickedBtnIdx != mineIdx && _mines[mineIdx] == 0) {
                 wxString msg;
                 _mines[mineIdx] = -1;
                 --mines;
             }
         }
-        for (auto m = 0; m < _gridSize; ++m) {
-            if (m % 10 == 0) std::cout << "\n";
-            std::cout << std::setw(3) << _mines[m];
-        }
-        //printSheetCode();
+        _console->printCheatSheet();
         _firstClick = true;
     }
 
@@ -169,17 +120,28 @@ void cMain::OnButtonClicked(wxCommandEvent& evt)
     
     if (_lastButton != -1) {
         btn[_lastButton]->SetBackgroundColour(wxNullColour);
-        // btn[nPrevButton]->SetBackgroundStyle(wxBG_STYLE_SYSTEM);
+        
         auto cells = getNeighouringCells(_lastButton);
         for (auto c : cells) {
-            btn[c.first * _column + c.second]->SetBackgroundColour(wxNullColour);
+            btn[c.first * _column + c.second]->SetBackgroundColour(*wxLIGHT_GREY);
         }
+
+        _console->setButtonState(_lastButton, A_NORMAL);
+
+        //// Update console
+        //auto x = _lastButton / _column;
+        //auto y = _lastButton % _column;
+        //move(1 + x, 3 * y);
+        //attron(A_NORMAL);
+        //printw(" . ");
+        //attroff(A_NORMAL);
+        //refresh();
     }
 
     if (_mines[clickedBtnIdx] == -1) {
         btn[clickedBtnIdx]->SetBackgroundColour(*wxRED);
         wxString msg;
-        msg.Printf("BOOOOM !! - You hit the mine!! Game Over :(-\nYour Score is %d/70", _score);
+        msg.Printf("BOOOOM !! - You hit the mine!! Game Over :(-\nYour Score is %d/%d", _score, _winningScore);
         wxMessageBox(msg);
         // Reset game
         resetGame();
@@ -198,43 +160,101 @@ void cMain::OnButtonClicked(wxCommandEvent& evt)
         btn[clickedBtnIdx]->Enable(false);
         btn[clickedBtnIdx]->SetBackgroundColour(*wxBLUE);
         ++_score;
+        updateScore();
 
-        if(_score == 70) {
+        if(_score == _winningScore) {
             wxMessageBox("Congratulations!! You Won The Game.");
             resetGame();
             return;
         }
-        // move(2, (3*x)+1);
-        // printw("%d", (3*x));
     }
     
+    _console->setButtonState(clickedBtnIdx, A_BLINK | A_REVERSE | A_BOLD);
+    //auto x = clickedBtnIdx / _column;
+    //auto y = clickedBtnIdx % _column;
+    //move(1 + x, 3 * y);
+    //attron(A_BLINK | A_REVERSE | A_BOLD);
+    //printw(" . ");
+    //attroff(A_BLINK | A_REVERSE | A_BOLD);
+    //refresh();
+
     _lastButton = clickedBtnIdx;
-    
-    
-    wxString score;
-    score.Printf("Score: %d/70", _score);
-    label->SetLabel(score);
     evt.Skip();
 }
 
 void cMain::OnAllMinesPressed(wxMouseEvent& evt)
 {
-    std::cout << "Pressed";
+    if (_firstClick) {
+        for (auto i = 0; i < _gridSize; ++i) {
+            if (_mines[i] == -1) {
+                btn[i]->SetBackgroundColour(*wxRED);
+            }
+        }
+    }
     evt.Skip();
 }
 
 void cMain::OnAllMinesRelease(wxMouseEvent& evt)
 {
-    std::cout << "Release";
+    if (_firstClick) {
+        for (auto i = 0; i < _gridSize; ++i) {
+            btn[i]->SetBackgroundColour(*wxLIGHT_GREY);
+        }
+
+        // color neighbouring cell cyan
+        auto cells = getNeighouringCells(_lastButton);
+        for (const auto c : cells) {
+            auto idx = c.first * _column + c.second;
+            if (_lastButton != idx) {
+                btn[idx]->SetBackgroundColour(*wxCYAN);
+            }
+        }
+    }
     evt.Skip();
+}
+
+void cMain::OnNeighbourMinesPressed(wxMouseEvent& evt)
+{
+    if (_firstClick) {
+        auto cells = getNeighouringCells(_lastButton);
+        for (const auto c : cells) {
+            auto idx = c.first * _column + c.second;
+            if (_mines[idx] == -1) {
+                btn[idx]->SetBackgroundColour(*wxRED);
+            }
+        }
+    }
+}
+
+void cMain::OnNeighbourMinesRelease(wxMouseEvent& evt)
+{
+    if (_firstClick) {
+        auto cells = getNeighouringCells(_lastButton);
+        for (const auto c : cells) {
+            auto idx = c.first * _column + c.second;
+            if (_mines[idx] == -1) {
+                btn[idx]->SetBackgroundColour(*wxCYAN);
+            }
+        }
+    }
+}
+
+void cMain::updateScore()
+{
+    wxString score;
+    score.Printf("Score: %d/%d", _score, _winningScore);
+    label->SetLabel(score);
 }
 
 void cMain::resetGame() {
     _firstClick = false;
     _score = 0;
     for (auto i = 0; i < _gridSize; ++i) {
+        btn[i]->SetBackgroundColour(*wxLIGHT_GREY);
         btn[i]->SetLabel("");
         btn[i]->Enable(true);
         _mines[i] = 0;
     }
+    label->SetFocus();
+    _console->clearConsole();
 }

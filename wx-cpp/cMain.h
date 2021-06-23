@@ -4,6 +4,8 @@
 #include <vector>
 #include <random>
 
+class cConsole;
+
 class cMain : public wxFrame
 {
 public:
@@ -15,10 +17,12 @@ public:
     void OnButtonClicked(wxCommandEvent& evt);
     void OnAllMinesPressed(wxMouseEvent& evt);
     void OnAllMinesRelease(wxMouseEvent& evt);
+    void OnNeighbourMinesPressed(wxMouseEvent& evt);
+    void OnNeighbourMinesRelease(wxMouseEvent& evt);
 
 private:
+    void updateScore();
     void resetGame();
-    void printSheetCode();
     ListOfCells getNeighouringCells(int32_t btnIdx);
 
     // wxDECLARE_EVENT_TABLE();
@@ -43,5 +47,6 @@ private:
 
     int* _mines{};
     wxStaticText* label{};
+    cConsole* _console;
 };
 
