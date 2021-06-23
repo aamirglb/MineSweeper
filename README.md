@@ -10,3 +10,5 @@ $ qmlscene MineSweeper.qml
 ```
 
 ![](mine_sweeper.png)
+
+`wx-cpp` contains implementation of MineSweeper using C++ and wxWidgets. 
