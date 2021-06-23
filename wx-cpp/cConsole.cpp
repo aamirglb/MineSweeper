@@ -28,6 +28,7 @@ void cConsole::clearConsole()
 
 void cConsole::printCheatSheet()
 {
+    move(0, 0);
     for (auto i = 0; i < (3 * _column); ++i)
         printw("=");
     printw("\n");
