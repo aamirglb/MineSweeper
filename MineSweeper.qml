@@ -3,28 +3,34 @@ import QtQuick.Layouts    1.12
 import QtQuick.Dialogs    1.3
 
 Rectangle {
-    id: _root
-    width:                      (80*_columnCount)+80
-    height:                     (50*_rowCount)+60+(50 * 2)
-    color:                      "white"
+    id:                           _root
+    width:                        (80*_columnCount)+80
+    height:                       (50*_rowCount)+60+(50 * 2)
+    color:                        "white"
 
-    property int _rowCount:     10
-    property int _columnCount:  10
-    property int _gridSize:     _rowCount * _columnCount
-    property int _mineCount:    Math.floor(_gridSize * 0.3)
-    property int _winScore:     _gridSize - _mineCount
-    property int _lastButton:   -1
-    property int _score:        0
-    property bool _firstClick:  false
-    property var _mines:        []
+    property int _rowCount:       10
+    property int _columnCount:    10
+    property int _gridSize:       _rowCount * _columnCount
+    property int _mineCount:      Math.floor(_gridSize * 0.3)
+    property int _winScore:       _gridSize - _mineCount
+    property int _lastButton:     -1
+    property int _score:          0
+    property bool _firstClick:    false
+    property var _mines:          []
+    property int _maxPower1:      1
+    property int _power1:         0
+    property int _maxPower2:      3
+    property int _power2:         0
+
     property alias _repeater:   gridContainer.repeater
-
 
     function resetGame() {
         _firstClick = false;
         _score = 0;
         _mines = [];
         _lastButton = -1;
+        _power1 = 0;
+        _power2 = 0;
 
         for(let i = 0; i < _gridSize; ++i) {
             _repeater.itemAt(i)._clicked = false;
@@ -68,32 +74,73 @@ Rectangle {
     }
 
     Rectangle {
-        id:            scoreLabel
-        anchors.left:  parent.left
-        anchors.top:   parent.top
-        width:         parent.width
-        height:        45
-        color:         "#f0f0f0"
-        border.color:  Qt.lighter(color)
+        id: header
+        anchors.left: parent.left
+        anchors.top: parent.top
+        width: parent.width
+        height: 50
+        color: "lightgray"
 
-        Text {
-            anchors.centerIn: parent
-            font.bold:        true
-            font.pixelSize:   24
-            color:            "green"
-            text:             qsTr("Score: %1/%2".arg(_score).arg(_winScore));
-        }
-        Component.onCompleted: {
-            console.log("_gridSize:", _gridSize)
-            console.log("_mineCount:", _mineCount)
-            console.log("_winScore:", _winScore)
+        RowLayout {
+            anchors.fill: parent
+            Rectangle {
+                id:                     p1Label
+                Layout.fillWidth:       true
+                Layout.minimumWidth:    _root.width * .3
+                Layout.preferredWidth:  _root.width * .3
+                Layout.maximumWidth:    _root.width * .3
+                Layout.minimumHeight:   45
+                color:                  "lightgray"
+                border.color:           Qt.lighter(color)
+                Text {
+                    anchors.centerIn:   parent
+                    font.bold:          true
+                    font.pixelSize:     18
+                    color:              "green"
+                    text:               qsTr("Power-1: %1/%2".arg(_power1).arg(_maxPower1))
+                }
+            }
+
+            Rectangle {
+                Layout.minimumWidth:    _root.width * .4
+                Layout.preferredWidth:  _root.width * .4
+                Layout.maximumWidth:    _root.width * .4
+                Layout.minimumHeight:   45
+                color:                  "lightgray"
+                border.color:           Qt.lighter(color)
+                Text {
+                    anchors.centerIn:  parent
+                    font.bold:         true
+                    font.pixelSize:    24
+                    color:             "blue"
+                    text:              qsTr("Score: %1/%2".arg(_score).arg(_winScore));
+                }
+            }
+
+            Rectangle {
+                Layout.minimumWidth:    _root.width * .3
+                Layout.preferredWidth:  _root.width * .3
+                Layout.maximumWidth:    _root.width * .3
+                Layout.minimumHeight:   45
+                color:                  "lightgray"
+                border.color:           Qt.lighter(color)
+                Text {
+                    anchors.centerIn:   parent
+                    font.bold:          true
+                    font.pixelSize:     18
+                    color:              "green"
+                    text:               qsTr("Power-2: %1/%2".arg(_power2).arg(_maxPower2))
+                }
+
+            }
+
         }
     }
 
     Rectangle {
         id:            gridContainer
         anchors.left:  parent.left
-        anchors.top:   scoreLabel.bottom
+        anchors.top:   header.bottom
 
         width:         parent.width
         height:        parent.height - 100
@@ -147,13 +194,11 @@ Rectangle {
                                     let totalMines = _mineCount;
                                     while(totalMines) {
                                         let rx = Math.floor(Math.random() * _gridSize);
-                                        console.log("rx: ", rx);
                                         if(rx === index || _mines[rx] === -1)
                                             continue;
                                         _mines[rx] = -1;
                                         --totalMines;
                                     }
-                                    console.log("_mines", _mines, _mineCount)
                                 }
 
                                 if(_mines[index] === -1) {
@@ -174,7 +219,6 @@ Rectangle {
 
                                 // highlight neighbours
                                 let cells = getSurroundingCells(index);
-                                console.log(cells);
                                 for(let i = 0; i < cells.length; ++i) {
                                     const [x, y] = cells[i];
                                     repeater.itemAt(x*_columnCount+y).color = "cyan";
@@ -193,8 +237,6 @@ Rectangle {
                                 _score++;
                                 _text = mineCount.toString();
                                 _lastButton = index;
-                                console.log("_lastButton:", _lastButton)
-
                                 if(_score === _winScore) {
                                     winDialog.visible = true;
                                 }
@@ -214,16 +256,19 @@ Rectangle {
 
         width:                 parent.width/2 - 4
         height:                45
-        color:                "lightgray"
+        color:                (_power1 < _maxPower1) ? "lightgray" : "darkgray"
         Text {
             anchors.centerIn:  parent
+            font.bold:         true
+            font.pixelSize:    16
             text:              qsTr("All Mines")
         }
         MouseArea {
             anchors.fill:      parent
             onPressed: {
-                if(!_firstClick) return;
+                if(!_firstClick || _power1 > _maxPower1) return;
 
+                ++_power1;
                 for(let i = 0; i < _gridSize; ++i) {
                     if(_mines[i] === -1)
                         _repeater.itemAt(i).color = "red";
@@ -257,15 +302,19 @@ Rectangle {
 
         width:                 parent.width/2 - 4
         height:                45
-        color:                "lightgray"
+        color:                (_power2 < _maxPower2) ? "lightgray" : "darkgray"
         Text {
             anchors.centerIn:  parent
+            font.bold:         true
+            font.pixelSize:    16
             text:              qsTr("Surrounding Mines")
         }
         MouseArea {
             anchors.fill:      parent
             onPressed: {
-                if(!_firstClick) return;
+                if(!_firstClick || _power2 > _maxPower2) return;
+
+                ++_power2;
                 let cells = getSurroundingCells(_lastButton);
                 for(let i = 0; i < cells.length; ++i) {
                     let [x, y] = cells[i];
