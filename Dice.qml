@@ -6,7 +6,8 @@ Rectangle {
     property int _margin: 8
 
     width:         60
-    height:        60
+    height:        width
+    radius:        width * .1
     color:         "#800000"
     border.color:  Qt.lighter(color)
 
